@@ -58,8 +58,8 @@ g.after_each(function()
     g.etcd:stop()
     fio.rmtree(g.datadir)
 
-    etcd:request('DELETE', '/keys/coordinator', {})
-    etcd:request('DELETE', '/keys/leaders', {})
+    etcd:request('DELETE', '/keys/lock', {})
+    etcd:request('DELETE', '/keys/leaders', {dir=true, recursive=true})
 end)
 
 local function create_client(srv)
@@ -137,11 +137,45 @@ function g.test_appointments()
         {A = 'a1', B = 'b1'}
     )
 
-    -- local ok, err = c:set_leaders({{'A', 'a2'}, {'A', 'a3'}}) -- TODO Duplicate
+    -- local ok, err = c:set_leaders({{'A', 'a2'}, {'A', 'a3'}}) -- TODO Duplicate handle in client
     -- t.assert_equals(ok, nil)
     -- t.assert_covers(err, {
     --     class_name = 'NetboxCallError',
     --     err = "Duplicate key exists in unique index 'ordinal'" ..
     --     " in space 'leader_audit'"
     -- })
+end
+
+function g.test_longpolling()
+    local c1 = create_client(g.etcd):get_session()
+    local kid = uuid.str()
+    t.assert_equals(
+        c1:acquire_lock({kid, 'localhost:9'}),
+        true
+    )
+    c1:set_leaders({{'A', 'a1'}, {'B', 'b1'}})
+
+    local client = create_client(g.etcd)
+    local function async_longpoll()
+        local chan = fiber.channel(1)
+        fiber.new(function()
+            local ret, err = client:longpoll(0.2)
+            print(ret)
+            chan:put({ret, err})
+        end)
+        return chan
+    end
+
+    t.assert_equals(client:longpoll(0), {A = 'a1', B = 'b1'})
+
+    local chan = async_longpoll()
+    c1:set_leaders({{'A', 'a2'}})
+    t.assert_equals(chan:get(0.1), {{A = 'a2'}})
+
+    local chan = async_longpoll()
+    -- there is no data in channel
+    t.assert_equals(chan:get(0.1), nil)
+
+    -- data recieved
+    t.assert_equals(chan:get(0.2), {{}})
 end
