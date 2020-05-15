@@ -2,9 +2,13 @@ local fiber = require 'fiber'
 local yaml = require 'yaml'
 local json = require 'json'
 
+local errors = require('errors')
+
 local http_client = require 'http.client'
 local urilib = require('uri')
 local digest = require 'digest'
+
+local EtcdError  = errors.new_class('EtcdError')
 
 local M = {}
 
@@ -76,7 +80,7 @@ function M:discovery()
         end
     end
     if #new_endpoints == 0 then
-        error("Failed to discover members",2)
+        return nil, EtcdError:new("Failed to discover members")
     end
     print("etcd endpoints "..table.concat(new_endpoints,", "))
     self.endpoints = new_endpoints
@@ -182,7 +186,7 @@ function M:list(keyspath)
         --  print()
         -- end
     else
-        error(json.encode(res),2)
+        return nil, EtcdError:new(json.encode(res))
     end
 end
 

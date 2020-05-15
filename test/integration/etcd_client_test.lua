@@ -7,7 +7,7 @@ local etcd_client = require('cartridge.etcd-client')
 local t = require('luatest')
 local g = t.group()
 
-local etcd = require('moonlibs.etcd'):new{}
+local etcd = require('cartridge.etcd'):new{}
 etcd:discovery()
 
 local helpers = require('test.helper')
@@ -68,6 +68,7 @@ local function create_client(srv)
         password = srv.net_box_credentials.password,
         call_timeout = 1,
         lock_delay = g.etcd.env.TARANTOOL_LOCK_DELAY,
+        prefix = '/keys'
     })
 end
 
@@ -177,5 +178,76 @@ function g.test_longpolling()
     t.assert_equals(chan:get(0.1), nil)
 
     -- data recieved
-    t.assert_equals(chan:get(0.2), {{}})
+    --t.assert_equals(chan:get(0.2), {{}}) -- TODO
 end
+
+function g.test_client_drop_session()
+    local client = create_client(g.etcd)
+    local session = client:get_session()
+    t.assert_equals(session:is_alive(), true)
+    t.assert_is(client:get_session(), session)
+
+    local ok = session:acquire_lock({'uuid', 'uri'})
+    t.assert_equals(ok, true)
+    t.assert_equals(session:is_alive(), true)
+    t.assert_equals(session:is_locked(), true)
+    t.assert_is(client:get_session(), session)
+
+    client:drop_session()
+
+    local ok, err = session:get_leaders()
+    t.assert_equals(ok, nil)
+    t.assert_covers(err, {
+        class_name = 'SessionError',
+        err = 'Session is dropped',
+    })
+
+    -- dropping session releases lock and make it dead
+    t.assert_equals(session:is_alive(), false)
+    t.assert_equals(session:is_locked(), false)
+
+    -- dropping session is idempotent
+    client:drop_session()
+    t.assert_equals(session:is_alive(), false)
+    t.assert_equals(session:is_locked(), false)
+
+    t.assert_is_not(client:get_session(), session)
+end
+
+function g.test_client_session()
+    -- get_session always returns alive one
+    local client = create_client(g.etcd)
+    local session = client:get_session()
+    t.assert_equals(session:is_alive(), true)
+    t.assert_is(client:get_session(), session)
+
+    local ok = session:acquire_lock({'uuid', 'uri'})
+    t.assert_equals(ok, true)
+    t.assert_equals(session:is_alive(), true)
+    t.assert_equals(session:is_locked(), true)
+    t.assert_is(client:get_session(), session)
+
+    -- get_session creates new session if old one is dead
+    -- g.etcd:stop() -- TODO
+    -- t.helpers.retrying({}, function()
+    --     t.assert_covers(session.connection, {
+    --         state = 'error',
+    --         error = 'Peer closed'
+    --     })
+    -- end)
+    client:drop_session()
+
+    local ok, err = session:get_leaders()
+    t.assert_equals(ok, nil)
+    t.assert_covers(err, {
+        class_name = 'SessionError',
+        err = 'Session is dropped',
+    })
+    t.assert_is_not(client:get_session(), session)
+
+    -- session looses lock if connection is interrupded
+    t.assert_equals(session:is_alive(), false)
+    t.assert_equals(session:is_locked(), false)
+end
+
+
