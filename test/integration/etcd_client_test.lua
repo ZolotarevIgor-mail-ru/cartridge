@@ -59,7 +59,7 @@ g.after_each(function()
     fio.rmtree(g.datadir)
 
     etcd:request('DELETE', '/keys/lock', {})
-    etcd:request('DELETE', '/keys/leaders', {dir=true, recursive=true})
+    etcd:request('DELETE', '/keys/leaders', {})
 end)
 
 local function create_client(srv)
@@ -178,7 +178,7 @@ function g.test_longpolling()
     t.assert_equals(chan:get(0.1), nil)
 
     -- data recieved
-    --t.assert_equals(chan:get(0.2), {{}}) -- TODO
+    -- t.assert_equals(chan:get(0.2), {{}}) -- TODO
 end
 
 function g.test_client_drop_session()

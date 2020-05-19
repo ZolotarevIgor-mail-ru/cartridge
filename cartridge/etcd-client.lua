@@ -55,7 +55,7 @@ local function acquire_lock(session, lock_args)
         end
     end
 
-    local leaders = etcd_client:request('GET', session.prefix..'/lock', {})
+    local leaders = etcd_client:request('GET', session.prefix..'/leaders', {})
     if leaders.errorCode ~= nil and leaders.errorCode ~= 100 then
         session.lock_acquired = false
         return nil, SessionError:new(leaders.message)
@@ -63,7 +63,7 @@ local function acquire_lock(session, lock_args)
 
     local leaders_data
     if leaders.errorCode == 100 then
-        leaders_data = ''
+        leaders_data = json.encode{}
     else
         leaders_data = leaders.node.value
     end
