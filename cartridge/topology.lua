@@ -25,6 +25,7 @@ vars:new('known_roles', {
         -- mode = 'disabled' | 'eventual' | 'stateful',
         -- state_provider = nil | 'tarantool',
         -- tarantool_params = nil | {uri = string, password = string},
+        -- consistent_switchover = boolean,
     },
     servers = {
         -- ['instance-uuid-1'] = 'expelled',
