@@ -96,6 +96,7 @@ function g.test_locks()
     )
 
     c1:drop()
+    c1:drop() -- it should be idempotent
 
     local kid = uuid.str()
     helpers.retrying({}, function()
