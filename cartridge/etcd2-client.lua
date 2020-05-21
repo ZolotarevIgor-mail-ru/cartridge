@@ -7,7 +7,7 @@
 local json = require('json')
 local uuid = require('uuid')
 local httpc = require('http.client').new({max_connections = 5})
-local etcd2 = require('etcd2')
+local etcd2 = require('cartridge.etcd2')
 local fiber = require('fiber')
 local checks = require('checks')
 local errors = require('errors')
@@ -48,33 +48,36 @@ local function acquire_lock(session, lock_args)
         if err.etcd_code == etcd2.EcodeNodeExist then
             return false
         else
+            session.connection:close()
             return nil, err
         end
     end
 
-    local resp = etcd2_client:request('GET', '/leaders')
-    if leaders.errorCode ~= nil and leaders.errorCode ~= 100 then
-        session.lock_acquired = false
-        return nil, SessionError:new(leaders.message)
-    end
-
-    local leaders_data
-    if leaders.errorCode == 100 then
-        leaders_data = json.encode{}
+    local leaders_resp, err = session.connection:request('GET', '/leaders')
+    if leaders_resp == nil then
+        if err.etcd_code == etcd2.EcodeKeyNotFound then
+            request_args = {
+                value = json.encode{}
+            }
+        else
+            return nil, err
+        end
     else
-        leaders_data = leaders.node.value
+        request_args = {
+            value = leaders_resp.node.value
+        }
     end
 
-    leaders = etcd2_client:request('PUT', session.prefix..'/leaders', {value=leaders_data})
-    if leaders.errorCode ~= nil then
-        return nil, SessionError:new(leaders.message)
+    leaders_resp, err = session.connection:request('PUT', '/leaders',
+        request_args
+    )
+    if leaders_resp == nil then
+        return nil, err
     end
 
-    session.leaders = json.decode(leaders.node.value)
-    session.index = leaders.node.modifiedIndex
-    session.uuid = lock_args[1]
-    session.uri = lock_args[2]
-    session.lock_acquired = true
+    session.lock_index = lock_resp.node.modifiedIndex
+    session.leaders = json.decode(leaders_resp.node.value)
+    session.leaders_index = leaders_resp.node.modifiedIndex
     return true
 end
 
@@ -120,7 +123,7 @@ local function set_leaders(session, updates)
     session._set_leaders_mutex:put(box.NULL)
 
     local resp, err = SessionError:pcall(function()
-        session.connection:request('PUT', '/leaders', {
+        return session.connection:request('PUT', '/leaders', {
             value = json.encode(new_leaders),
             prevIndex = session.leaders_index,
         })
@@ -201,6 +204,7 @@ local function drop(session)
         end)
     end
     session.connection:close()
+    return true
 end
 
 local session_mt = {
@@ -229,7 +233,7 @@ local function get_session(client)
         prefix = client.cfg.prefix,
         request_timeout = client.cfg.request_timeout,
         username = client.cfg.username,
-        password = client.cfconnection.prefixg.password,
+        password = client.cfg.password,
     })
 
     local session = {
@@ -268,20 +272,35 @@ local function longpoll(client, timeout)
                 session.longpoll_index = err.etcd_index
             end
         else
-            resp, err = client:request('GET', '/leaders', {
+            resp, err = session.connection:request('GET', '/leaders', {
                 wait = true,
-                waitIndex = session.longpoll_index + 1
+                waitIndex = session.longpoll_index + 1,
             }, {timeout = timeout})
         end
 
         if resp ~= nil then
+            local new_leaders = json.decode(resp.node.value)
+            local old_leaders = session.leaders or {}
+
+            local updates = {}
+            if session.longpoll_index == nil then
+                updates = new_leaders
+            else
+                for replicaset_uuid, instance_uuid in pairs(new_leaders) do
+                    if old_leaders[replicaset_uuid] ~= new_leaders[replicaset_uuid] then
+                        updates[replicaset_uuid] = new_leaders[replicaset_uuid]
+                    end
+                end
+            end
+
+            session.leaders = new_leaders
             session.longpoll_index = resp.node.modifiedIndex
-            return json.decode(resp.node.value)
+            return updates
         end
 
         if fiber.time() < deadline then
             -- connection refused etc.
-            fiber.sleep(client.call_timeout)
+            fiber.sleep(session.connection.request_timeout)
         elseif err.http_code == 408 then
             -- timeout, no updates
             return {}

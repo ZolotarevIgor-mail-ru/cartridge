@@ -42,7 +42,7 @@ local function request(connection, method, path, args, opts)
             ['Content-Type'] = 'application/x-www-form-urlencoded',
             ['Authorization'] = connection.http_auth,
         },
-        timeout = opts.timeout or connection.request_timeout,
+        timeout = (opts and opts.timeout) or connection.request_timeout,
         verbose = connection.verbose,
     }
 
@@ -56,8 +56,12 @@ local function request(connection, method, path, args, opts)
             eidx = eidx % num_endpoints
         end
 
-        local resp = httpc:request(method,
-            connection.endpoints[eidx] .. path, body, http_opts
+        if body ~= nil then
+            path = path .. '?' .. body
+        end
+
+        local resp = httpc.request(method,
+            connection.endpoints[eidx] .. path, nil, http_opts
         )
 
         if resp == nil or resp.status >= 500 then
@@ -110,7 +114,7 @@ local function _discovery(connection)
     end
 
     for _, e in pairs(connection.endpoints) do
-        local resp = httpc:get(e .. "/v2/members", {
+        local resp = httpc.get(e .. "/v2/members", {
             headers = {
                 ['Connection'] = 'Keep-Alive',
                 ['Authorization'] = connection.http_auth,
