@@ -56,12 +56,16 @@ local function request(connection, method, path, args, opts)
             eidx = eidx % num_endpoints
         end
 
-        if body ~= nil then
+        -- Built-in taratool http.client substitutes GET with POST if
+        -- body is not nil. This is a workaround in order to create GET
+        -- request with args (e.g. wait = true)
+        if method == 'GET' and body ~= nil then
             path = path .. '?' .. body
+            body = nil
         end
 
         local resp = httpc.request(method,
-            connection.endpoints[eidx] .. path, nil, http_opts
+            connection.endpoints[eidx] .. path, body, http_opts
         )
 
         if resp == nil or resp.status >= 500 then
