@@ -53,6 +53,20 @@ local function acquire_lock(session, lock_args)
         end
     end
 
+    -- if session was locked there is no need to renew leaders
+    -- done in order to avoid this:
+    -- fiber 1: acquire_lock GET /leaders
+    -- fiber 1: acquire_lock PUT /leaders not-CAS (yield)
+    -- fiber 2: set_leaders PUT /leaders CAS (yield)
+    -- fiber 1: acquire_lock session.leaders_index = leaders_resp.node.modifiedIndex
+    -- fiber 1: set_leaders - fail
+    if session:is_locked() then
+        assert(session.leaders ~= nil)
+        assert(session.leaders_index ~= nil)
+        session.lock_index = lock_resp.node.modifiedIndex
+        return true
+    end
+
     local leaders_resp, err = session.connection:request('GET', '/leaders')
     if leaders_resp == nil then
         if err.etcd_code == etcd2.EcodeKeyNotFound then
@@ -241,6 +255,7 @@ local function get_session(client)
         lock_delay = client.cfg.lock_delay,
 
         lock_index = nil, -- used by session:acquire_lock() and :drop()
+        leaders_index = nil, -- used by session:set_leaders() and :acquire_lock()
         longpoll_index = nil, -- used by client:longpoll()
     }
     client.session = setmetatable(session, session_mt)
