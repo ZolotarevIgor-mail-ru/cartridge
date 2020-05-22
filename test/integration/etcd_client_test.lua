@@ -144,14 +144,14 @@ function g.test_longpolling()
 
     local chan = async_longpoll()
     t.assert(c1:set_leaders({{'A', 'a2'}}), true)
-    t.assert_equals(chan:get(0.1), {{A = 'a2'}})
+    t.assert_equals(chan:get(0.1), {{A = 'a2', B = 'b1'}})
 
     local chan = async_longpoll()
     -- there is no data in channel
     t.assert_equals(chan:get(0.1), nil)
 
     -- data recieved
-    t.assert_equals(chan:get(0.2), {{}}) -- TODO
+    t.assert_equals(chan:get(0.2), {{}})
 end
 
 function g.test_client_drop_session()

@@ -1,9 +1,3 @@
--- TODO
--- etcd2_client implementation
--- lock_delay location
--- connection status
--- set_leaders duplicates
-
 local json = require('json')
 local uuid = require('uuid')
 local httpc = require('http.client').new({max_connections = 5})
@@ -146,6 +140,8 @@ local function set_leaders(session, updates)
     session._set_leaders_mutex:get()
 
     if resp == nil then
+        -- if session can't set leaders then session is dropped
+        session.connection:close()
         return nil, err
     end
 
@@ -294,23 +290,8 @@ local function longpoll(client, timeout)
         end
 
         if resp ~= nil then
-            local new_leaders = json.decode(resp.node.value)
-            local old_leaders = session.leaders or {}
-
-            local updates = {}
-            if session.longpoll_index == nil then
-                updates = new_leaders
-            else
-                for replicaset_uuid, instance_uuid in pairs(new_leaders) do
-                    if old_leaders[replicaset_uuid] ~= new_leaders[replicaset_uuid] then
-                        updates[replicaset_uuid] = new_leaders[replicaset_uuid]
-                    end
-                end
-            end
-
-            session.leaders = new_leaders
             session.longpoll_index = resp.node.modifiedIndex
-            return updates
+            return json.decode(resp.node.value)
         end
 
         if fiber.time() < deadline then
