@@ -1,52 +1,55 @@
+local t = require('luatest')
+local g = t.group()
+
 local fio = require('fio')
 local uuid = require('uuid')
 local fiber = require('fiber')
-local socket = require('socket')
-local utils = require('cartridge.utils')
+local httpc = require('http.client')
 local etcd2_client = require('cartridge.etcd2-client')
-local t = require('luatest')
-local g = t.group('etcd_client')
-
-local etcd2 = require('cartridge.etcd2')
 
 local helpers = require('test.helper')
 
-local function create_connection()
-    return etcd2.connect(nil, {
-        prefix = 'etcd2_client_test',
-        username = 'client',
-        password = g.password,
-        request_timeout = 1,
-    })
-end
+local URI = 'http://127.0.0.1:14001'
 
 local function create_client()
     return etcd2_client.new({
         prefix = 'etcd2_client_test',
         lock_delay = g.lock_delay,
-        endpoints = {
-            'http://127.0.0.1:4001',
-            'http://127.0.0.1:2379',
-        },
-        username = 'client',
-        password = g.password,
+        endpoints = {URI},
         request_timeout = 1,
     })
 end
 
-g.before_all(function()
+g.before_each(function()
+    local etcd_path = os.getenv('ETCD_PATH')
+    t.skip_if(
+        etcd_path == nil,
+        'Missing etcd. Skipping'
+    )
+
+    g.datadir = fio.tempdir()
+    g.etcd = t.Process:start(etcd_path, {
+        '--data-dir', g.datadir,
+        '--listen-peer-urls', 'http://localhost:17001',
+        '--listen-client-urls', URI,
+        '--advertise-client-urls', URI,
+    })
+    helpers.retrying({}, function()
+        local resp = httpc.put(URI .. '/v2/keys/hello?value=world')
+        assert(resp.status == 200)
+        require('log').info(
+            httpc.get(URI ..'/version').body
+        )
+    end)
+
     g.password = require('digest').urandom(6):hex()
     g.lock_delay = 40
-
-    g.etcd2_connection = create_connection()
 end)
 
 g.after_each(function()
-    g.lock_delay = 40
-    g.etcd2_connection:request('DELETE', '/lock', {})
-    g.etcd2_connection:request('DELETE', '/leaders', {})
+    g.etcd:kill()
+    fio.rmtree(g.datadir)
 end)
-
 
 function g.test_locks()
     local c1 = create_client():get_session()
@@ -251,9 +254,13 @@ function g.test_client_session()
     t.assert_is(client:get_session(), session)
 
     -- get_session creates new session if old one is dead
-    g.etcd2_connection:request('DELETE', '/lock', {})
+    httpc.delete(URI .. '/v2/keys/etcd2_client_test/lock')
+
     t.helpers.retrying({}, function()
-        t.assert_equals(session:acquire_lock({uuid = 'uuid', uri = 'uri'}), nil)
+        t.assert_equals(
+            session:acquire_lock({uuid = 'uuid', uri = 'uri'}),
+            nil
+        )
     end)
 
     local ok, err = session:get_leaders()

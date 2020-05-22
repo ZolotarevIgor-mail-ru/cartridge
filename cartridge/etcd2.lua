@@ -73,10 +73,10 @@ local function request(connection, method, path, args, opts)
             goto continue
         end
 
-        local etcd_cluster_id = resp.headers['x-etcd-cluster-id']
+        local etcd_cluster_id = resp.headers and resp.headers['x-etcd-cluster-id']
         if etcd_cluster_id ~= connection.etcd_cluster_id then
-            connection:close()
-            return nil, EtcdConnectionError:new('Etcd cluster id mismatch')
+            lasterror = EtcdConnectionError:new('Etcd cluster id mismatch')
+            goto continue
         end
 
         local ok, data = pcall(json.decode, resp.body)
@@ -105,6 +105,10 @@ local function request(connection, method, path, args, opts)
 
         ::continue::
     end
+
+    -- Not a single endpoint was able to reply conforming etcd protocol.
+    -- We better close the connection and try to reconnect later.
+    connection:close()
 
     assert(lasterror ~= nil)
     return nil, lasterror
