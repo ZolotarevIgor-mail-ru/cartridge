@@ -19,13 +19,13 @@ local function request(connection, method, path, args, opts)
         timeout = '?number',
     })
 
-    connection:_discovery()
-
-    if connection.state ~= 'connected' then
-        return nil, EtcdConnectionError:new(
-            'Etcd connection is in %s state', connection.state
-        )
+    local ok, err = connection:_discovery()
+    if not ok then
+        return nil, err
+    else
+        assert(connection.state == 'connected')
     end
+
     assert(connection.etcd_cluster_id ~= nil)
 
     local body = {}
@@ -64,19 +64,19 @@ local function request(connection, method, path, args, opts)
             eidx = eidx % num_endpoints
         end
 
-        local resp = httpc.request(method,
-            connection.endpoints[eidx] .. path, body, http_opts
-        )
-
+        local url = connection.endpoints[eidx] .. path
+        local resp = httpc.request(method, url, body, http_opts)
         if resp == nil or resp.status >= 500 then
-            lasterror = HttpError:new(resp and (resp.body or resp.reason))
+            lasterror = HttpError:new('%s: %s',
+                url, resp and (resp.body or resp.reason)
+            )
             goto continue
         end
 
         local etcd_cluster_id = resp.headers['x-etcd-cluster-id']
         if etcd_cluster_id ~= connection.etcd_cluster_id then
-            lasterror = EtcdConnectionError:new('Etcd cluster id mismatch')
-            goto continue
+            connection:close()
+            return nil, EtcdConnectionError:new('Etcd cluster id mismatch')
         end
 
         local ok, data = pcall(json.decode, resp.body)
@@ -113,12 +113,17 @@ end
 local function _discovery(connection)
     checks('etcd2_connection')
 
-    if connection.state ~= 'initial' then
-        return
+    ::start_over::
+    if connection.state == 'connected' then
+        return true
+    elseif connection.state == 'closed' then
+        return nil, EtcdConnectionError:new('Connection closed')
     end
 
+    local lasterror
     for _, e in pairs(connection.endpoints) do
-        local resp = httpc.get(e .. "/v2/members", {
+        local url = e .. "/v2/members"
+        local resp = httpc.get(url, {
             headers = {
                 ['Connection'] = 'Keep-Alive',
                 ['Authorization'] = connection.http_auth,
@@ -129,17 +134,23 @@ local function _discovery(connection)
 
         if connection.state ~= 'initial' then
             -- something may change during network yield
-            return
+            goto start_over
         end
 
         if resp == nil
         or resp.status ~= 200
-        or resp.headers['content-type'] ~= 'application/json' then
+        then
+            lasterror = HttpError:new('%s: %s',
+                url, resp and (resp.body or resp.reason)
+            )
             goto continue
         end
 
         local ok, data = pcall(json.decode, resp.body)
         if not ok then
+            lasterror = EtcdConnectionError:new(
+                'Discovery failed, unexpeced response: %s', data
+            )
             goto continue
         end
 
@@ -160,11 +171,15 @@ local function _discovery(connection)
             connection.endpoints = new_endpoints
             connection.eidx = math.random(#new_endpoints)
             connection.state = 'connected'
-            return
+            return true
         end
 
+        lasterror = EtcdConnectionError:new('Discovered nothing')
         ::continue::
     end
+
+    assert(lasterror ~= nil)
+    return nil, lasterror
 end
 
 local function close(connection)

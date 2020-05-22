@@ -263,18 +263,14 @@ local function longpoll(client, timeout)
         local resp, err
         if session.longpoll_index == nil then
             resp, err = session.connection:request('GET', '/leaders')
-            if resp == nil and err.etcd_code == 100 then
-                -- key not found
+            if resp == nil and err.etcd_code == etcd2.EcodeKeyNotFound then
                 session.longpoll_index = err.etcd_index
             end
         else
-            local req = string.format(
-                '/leaders?wait=true&waitIndex=%d',
-                session.longpoll_index + 1
-            )
-            resp, err = session.connection:request('GET',
-                req, nil, {timeout = timeout}
-            )
+            resp, err = session.connection:request('GET', '/leaders', {
+                wait = true,
+                waitIndex = session.longpoll_index + 1,
+            }, {timeout = timeout})
         end
 
         if resp ~= nil then
