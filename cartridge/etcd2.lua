@@ -36,6 +36,14 @@ local function request(connection, method, path, args, opts)
     end
     local body = table.concat(body, '&')
     local path = fio.pathjoin('/v2/keys', connection.prefix, path)
+    -- Workaround for https://github.com/tarantool/tarantool/issues/4173
+    -- Built-in taratool http.client substitutes GET with POST if
+    -- body is not nil.
+    if method == 'GET' and body ~= '' then
+        path = path .. '?' .. body
+        body = nil
+    end
+
     local http_opts = {
         headers = {
             ['Connection'] = 'Keep-Alive',
@@ -54,14 +62,6 @@ local function request(connection, method, path, args, opts)
         local eidx = connection.eidx + i
         if eidx > num_endpoints then
             eidx = eidx % num_endpoints
-        end
-
-        -- Built-in taratool http.client substitutes GET with POST if
-        -- body is not nil. This is a workaround in order to create GET
-        -- request with args (e.g. wait = true)
-        if method == 'GET' and body ~= nil then
-            path = path .. '?' .. body
-            body = nil
         end
 
         local resp = httpc.request(method,

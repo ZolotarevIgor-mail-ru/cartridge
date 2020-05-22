@@ -1,17 +1,11 @@
 local json = require('json')
-local uuid = require('uuid')
-local httpc = require('http.client').new({max_connections = 5})
 local etcd2 = require('cartridge.etcd2')
 local fiber = require('fiber')
 local checks = require('checks')
 local errors = require('errors')
-local digest = require('digest')
-local uri_lib = require('uri')
 
 local ClientError  = errors.new_class('ClientError')
 local SessionError = errors.new_class('SessionError')
-local HttpError = errors.new_class('HttpError')
-local EtcdError = errors.new_class('EtcdError')
 
 local function acquire_lock(session, lock_args)
     checks('etcd2_session', {
@@ -140,8 +134,6 @@ local function set_leaders(session, updates)
     session._set_leaders_mutex:get()
 
     if resp == nil then
-        -- if session can't set leaders then session is dropped
-        session.connection:close()
         return nil, err
     end
 
@@ -204,15 +196,17 @@ local function drop(session)
     checks('etcd2_session')
     assert(session.connection ~= nil)
 
+    -- save lock_index locally before request yields
     local lock_index = session.lock_index
+    session.lock_index = nil
     if lock_index ~= nil then
         pcall(function()
-            session.lock_index = nil
             session.connection:request('DELETE', '/lock', {
                 prevIndex = lock_index,
             })
         end)
     end
+
     session.connection:close()
     return true
 end
@@ -283,10 +277,12 @@ local function longpoll(client, timeout)
                 session.longpoll_index = err.etcd_index
             end
         else
-            resp, err = session.connection:request('GET', '/leaders', {
-                wait = true,
-                waitIndex = session.longpoll_index + 1,
-            }, {timeout = timeout})
+            resp, err = session.connection:request('GET',
+                string.format(
+                    '/leaders?wait=true&waitIndex=%d',
+                    session.longpoll_index + 1
+                ), {timeout = timeout}
+            )
         end
 
         if resp ~= nil then
