@@ -37,7 +37,7 @@ local utils = require('cartridge.utils')
 local topology = require('cartridge.topology')
 local service_registry = require('cartridge.service-registry')
 local stateboard_client = require('cartridge.stateboard-client')
-local etcd_client = require('cartridge.etcd-client')
+local etcd2_client = require('cartridge.etcd2-client')
 
 local FailoverError = errors.new_class('FailoverError')
 local ApplyConfigError = errors.new_class('ApplyConfigError')
@@ -123,7 +123,7 @@ end
 -- @function _get_appointments_stateful_mode
 -- @local
 local function _get_appointments_stateful_mode(client, timeout)
-    checks('stateboard_client|etcd_client', 'number')
+    checks('stateboard_client|etcd2_client', 'number')
     return client:longpoll(timeout)
 end
 
@@ -321,18 +321,18 @@ local function cfg(clusterwide_config)
             )
         elseif failover_cfg.state_provider == 'etcd2' then
             local params = assert(failover_cfg.etcd2_params)
-            vars.client = etcd_client.new({
+            vars.client = etcd2_client.new({
                 endpoints = params.endpoints,
                 prefix = params.prefix,
                 username = params.username,
                 password = params.password,
                 lock_delay = params.lock_delay,
-                timeout = vars.options.NETBOX_CALL_TIMEOUT,
+                request_timeout = vars.options.NETBOX_CALL_TIMEOUT,
             })
 
             log.info(
                 'Stateful failover enabled with etcd-v2 at %s',
-                json.encode(params.endpoints)
+                table.concat(params.endpoints, ', ')
             )
         else
             return nil, ApplyConfigError:new(

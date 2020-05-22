@@ -29,10 +29,10 @@ local function acquire_lock(session, lock_args)
         request_args.prevExist = false
     end
 
-    local lock_resp, err = session.connection:request('PUT', '/lock',
+    local resp, err = session.connection:request('PUT', '/lock',
         request_args
     )
-    if lock_resp == nil then
+    if resp == nil then
         if err.etcd_code == etcd2.EcodeNodeExist then
             return false
         else
@@ -41,45 +41,36 @@ local function acquire_lock(session, lock_args)
         end
     end
 
-    -- if session was locked there is no need to renew leaders
-    -- done in order to avoid this:
-    -- fiber 1: acquire_lock GET /leaders
-    -- fiber 1: acquire_lock PUT /leaders not-CAS (yield)
-    -- fiber 2: set_leaders PUT /leaders CAS (yield)
-    -- fiber 1: acquire_lock session.leaders_index = leaders_resp.node.modifiedIndex
-    -- fiber 1: set_leaders - fail
+    local lock_index = resp.node.modifiedIndex
+
+    -- if session is already locked there is no need to renew leaders
     if session:is_locked() then
         assert(session.leaders ~= nil)
         assert(session.leaders_index ~= nil)
-        session.lock_index = lock_resp.node.modifiedIndex
+        session.lock_index = lock_index
         return true
     end
 
-    local leaders_resp, err = session.connection:request('GET', '/leaders')
-    if leaders_resp == nil then
-        if err.etcd_code == etcd2.EcodeKeyNotFound then
-            request_args = {
-                value = json.encode{}
-            }
-        else
-            return nil, err
-        end
+    local leaders_value
+    local resp, err = session.connection:request('GET', '/leaders')
+    if resp ~= nil then
+        leaders_value = resp.node.value
+    elseif err.etcd_code == etcd2.EcodeKeyNotFound then
+        leaders_value = '{}'
     else
-        request_args = {
-            value = leaders_resp.node.value
-        }
-    end
-
-    leaders_resp, err = session.connection:request('PUT', '/leaders',
-        request_args
-    )
-    if leaders_resp == nil then
         return nil, err
     end
 
-    session.lock_index = lock_resp.node.modifiedIndex
-    session.leaders = json.decode(leaders_resp.node.value)
-    session.leaders_index = leaders_resp.node.modifiedIndex
+    local resp, err = session.connection:request('PUT', '/leaders',
+        {value = leaders_value}
+    )
+    if resp == nil then
+        return nil, err
+    end
+
+    session.leaders = json.decode(resp.node.value)
+    session.leaders_index = resp.node.modifiedIndex
+    session.lock_index = lock_index
     return true
 end
 
@@ -277,11 +268,12 @@ local function longpoll(client, timeout)
                 session.longpoll_index = err.etcd_index
             end
         else
+            local req = string.format(
+                '/leaders?wait=true&waitIndex=%d',
+                session.longpoll_index + 1
+            )
             resp, err = session.connection:request('GET',
-                string.format(
-                    '/leaders?wait=true&waitIndex=%d',
-                    session.longpoll_index + 1
-                ), {timeout = timeout}
+                req, nil, {timeout = timeout}
             )
         end
 
