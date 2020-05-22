@@ -42,6 +42,7 @@ g.before_all(function()
 end)
 
 g.after_each(function()
+    g.lock_delay = 40
     g.etcd2_connection:request('DELETE', '/lock', {})
     g.etcd2_connection:request('DELETE', '/leaders', {})
 end)
@@ -185,6 +186,55 @@ function g.test_client_drop_session()
     t.assert_equals(session:is_locked(), false)
 
     t.assert_is_not(client:get_session(), session)
+end
+
+function g.test_outage()
+    -- Test case:
+    -- 1. Coordinator C1 acquires a lock and freezes;
+    -- 2. Lock delay expires and stateboard allows C2 to acquire it again;
+    -- 3. C2 writes some decisions and releases a lock;
+    -- 4. C1 comes back;
+    -- Goal: C1 must be informed on his outage
+
+    g.lock_delay = 0
+
+    local payload = {uuid = uuid.str(), uri = 'localhost:9'}
+
+    local c1 = create_client():get_session()
+    t.assert_equals(
+        {c1:acquire_lock(payload)},
+        {true}
+    )
+    t.assert_equals(
+        -- C1 can renew expired lock if it wasn't stolen yet
+        {c1:acquire_lock(payload)},
+        {true}
+    )
+
+    local c2 = create_client():get_session()
+    t.helpers.retrying({}, function()
+        t.assert_equals(
+            {c2:acquire_lock(payload)},
+            {true}
+        )
+    end)
+
+    c2:drop()
+
+    -- C1 can't renew lock after it was stolen by C2
+    local ok, err = c1:acquire_lock(payload)
+    t.assert_equals(ok, nil)
+    t.assert_covers(err, {
+        class_name = 'SessionError',
+        err = 'The lock was stolen'
+    })
+
+    local ok, err = c1:set_leaders({})
+    t.assert_equals(ok, nil)
+    t.assert_covers(err, {
+        class_name = 'SessionError',
+        err = 'You are not holding the lock'
+    })
 end
 
 function g.test_client_session()

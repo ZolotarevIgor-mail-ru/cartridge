@@ -37,6 +37,10 @@ local function acquire_lock(session, lock_args)
             return false
         else
             session.connection:close()
+            if err.etcd_code == etcd2.EcodeTestFailed
+            or err.etcd_code == etcd2.EcodeKeyNotFound then
+                return nil, SessionError:new('The lock was stolen')
+            end
             return nil, err
         end
     end
@@ -82,12 +86,12 @@ end
 local function set_leaders(session, updates)
     checks('etcd2_session', 'table')
 
-    if not session:is_alive() then
-        return nil, SessionError:new('Session is dropped')
-    end
-
     if not session:is_locked() then
         return nil, SessionError:new('You are not holding the lock')
+    end
+
+    if not session:is_alive() then
+        return nil, SessionError:new('Session is dropped')
     end
 
     assert(session.leaders ~= nil)
