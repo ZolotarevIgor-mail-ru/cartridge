@@ -70,7 +70,7 @@ function g.test_locks()
     local kid = uuid.str()
 
     t.assert_equals(
-        c1:acquire_lock({kid, 'localhost:9'}),
+        c1:acquire_lock({uuid = kid, uri = 'localhost:9'}),
         true
     )
     t.assert_equals(
@@ -79,7 +79,7 @@ function g.test_locks()
     )
 
     t.assert_equals(
-        c2:acquire_lock({uuid.str(), 'localhost:11'}),
+        c2:acquire_lock({uuid = uuid.str(), uri = 'localhost:11'}),
         false
     )
 
@@ -104,7 +104,7 @@ function g.test_locks()
     end)
 
     t.assert_equals(
-        c2:acquire_lock({kid, 'localhost:11'}),
+        c2:acquire_lock({uuid = kid, uri = 'localhost:11'}),
         true
     )
     t.assert_equals(
@@ -117,7 +117,7 @@ function g.test_appointments()
     local c = create_client(g.stateboard):get_session()
     local kid = uuid.str()
     t.assert_equals(
-        c:acquire_lock({kid, 'localhost:9'}),
+        c:acquire_lock({uuid = kid, uri = 'localhost:9'}),
         true
     )
 
@@ -144,7 +144,7 @@ function g.test_longpolling()
     local c1 = create_client(g.stateboard):get_session()
     local kid = uuid.str()
     t.assert_equals(
-        c1:acquire_lock({kid, 'localhost:9'}),
+        c1:acquire_lock({uuid = kid, uri = 'localhost:9'}),
         true
     )
     c1:set_leaders({{'A', 'a1'}, {'B', 'b1'}})
@@ -202,7 +202,7 @@ function g.test_outage()
         g.stateboard:connect_net_box()
     end)
 
-    local payload = {uuid.str(), 'localhost:9'}
+    local payload = {uuid = uuid.str(), uri = 'localhost:9'}
 
     local c1 = create_client(g.stateboard):get_session()
     t.assert_equals(
@@ -245,7 +245,7 @@ function g.test_client_session()
     t.assert_equals(session:is_alive(), true)
     t.assert_is(client:get_session(), session)
 
-    local ok = session:acquire_lock({'uuid', 'uri'})
+    local ok = session:acquire_lock({uuid = 'uuid', uri = 'uri'})
     t.assert_equals(ok, true)
     t.assert_equals(session:is_alive(), true)
     t.assert_equals(session:is_locked(), true)
@@ -279,7 +279,7 @@ function g.test_client_drop_session()
     t.assert_equals(session:is_alive(), true)
     t.assert_is(client:get_session(), session)
 
-    local ok = session:acquire_lock({'uuid', 'uri'})
+    local ok = session:acquire_lock({uuid = 'uuid', uri = 'uri'})
     t.assert_equals(ok, true)
     t.assert_equals(session:is_alive(), true)
     t.assert_equals(session:is_locked(), true)

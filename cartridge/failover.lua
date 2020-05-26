@@ -26,7 +26,6 @@
 -- @local
 
 local log = require('log')
-local json = require('json')
 local fiber = require('fiber')
 local checks = require('checks')
 local errors = require('errors')

@@ -24,6 +24,12 @@ RUN yum clean all &&\
     rm -rf /var/cache &&\
     rm -rf /root/.cache
 
+ENV ETCD_VER="v2.3.8"
+RUN curl -L https://github.com/coreos/etcd/releases/download/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o ${PWD}/etcd-${ETCD_VER}-linux-amd64.tar.gz &&\
+    tar -xaf ${PWD}/etcd-${ETCD_VER}-linux-amd64.tar.gz
+
+ENV ETCD_PATH="${PWD}/etcd-${ETCD_VER}-linux-amd64/etcd"
+
 RUN tarantoolctl rocks install https://raw.githubusercontent.com/tarantool/LDoc/tarantool/ldoc-scm-2.rockspec \
         --server=http://rocks.moonscript.org &&\
     tarantoolctl rocks install luacheck &&\
