@@ -390,7 +390,7 @@ local function validate_failover_schema(field, topology)
             e_config:assert(
                 type(params.password) == 'string',
                 '%s.password must be a string, got %s',
-                field, type(params.params)
+                field, type(params.password)
             )
 
             local known_keys = {
@@ -403,6 +403,68 @@ local function validate_failover_schema(field, topology)
                     '%s has unknown parameter %q', field, k
                 )
             end
+        end
+
+        if topology.failover.etcd2_params ~= nil then -- TODO
+            local params = topology.failover.etcd2_params
+            local field = field .. '.failover.etcd2_params'
+            e_config:assert(
+                type(params) == 'table',
+                '%s must be a table, got %s',
+                field, type(params)
+            )
+
+            e_config:assert(
+                type(params.endpoints) == 'string',
+                '%s.endpoints must be a string, got %s',
+                field, type(params.endpoints)
+            )
+
+            local _, err = pool.format_uri(params.endpoints)
+            e_config:assert(
+                not err,
+                '%s.endpoints: %s',
+                field, err and err.err
+            )
+
+            e_config:assert(
+                type(params.prefix) == 'string',
+                '%s.prefix must be a string, got %s',
+                field, type(params.prefix)
+            )
+
+            e_config:assert(
+                type(params.username) == 'string',
+                '%s.username must be a string, got %s',
+                field, type(params.username)
+            )
+
+            e_config:assert(
+                type(params.password) == 'string',
+                '%s.password must be a string, got %s',
+                field, type(params.password)
+            )
+
+            e_config:assert(
+                type(params.lock_delay) == 'number',
+                '%s.lock_delay must be a number, got %s',
+                field, type(params.lock_delay)
+            )
+
+            local known_keys = {
+                ['endpoints'] = true,
+                ['prefix'] = true,
+                ['username'] = true,
+                ['password'] = true,
+                ['lock_delay'] = true,
+            }
+            for k, _ in pairs(params) do
+                e_config:assert(
+                    known_keys[k],
+                    '%s has unknown parameter %q', field, k
+                )
+            end
+
         end
 
         local known_keys = {

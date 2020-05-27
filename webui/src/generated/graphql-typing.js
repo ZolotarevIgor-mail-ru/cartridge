@@ -111,9 +111,10 @@ export type Error = {
 /** Failover parameters managent */
 export type FailoverApi = {
   tarantool_params?: ?FailoverStateProviderCfgTarantool,
+  etcd2_params?: ?FailoverStateProviderCfgEtcd2,
   /** Supported modes are "disabled", "eventual" and "stateful". */
   mode: $ElementType<Scalars, "String">,
-  /** Type of external storage for the mode "stateful". Only "tarantool" is supported now. */
+  /** Type of external storage for the mode "stateful". "tarantool" and "etcd2" are supported now. */
   state_provider?: ?$ElementType<Scalars, "String">
 };
 
@@ -127,6 +128,24 @@ export type FailoverStateProviderCfgInputTarantool = {
 export type FailoverStateProviderCfgTarantool = {
   uri: $ElementType<Scalars, "String">,
   password: $ElementType<Scalars, "String">
+};
+
+/** State provider configuration (etcd2) */
+export type FailoverStateProviderCfgInputEtcd2 = {
+  endpoints: $ElementType<Scalars, "String">,
+  prefix: $ElementType<Scalars, "String">,
+  username: $ElementType<Scalars, "String">,
+  password: $ElementType<Scalars, "String">,
+  lock_delay: $ElementType<Scalars, "Float">
+};
+
+/** State provider configuration (etcd2) */
+export type FailoverStateProviderCfgEtcd2 = {
+  endpoints: $ElementType<Scalars, "String">,
+  prefix: $ElementType<Scalars, "String">,
+  username: $ElementType<Scalars, "String">,
+  password: $ElementType<Scalars, "String">,
+  lock_delay: $ElementType<Scalars, "Float">
 };
 
 export type Issue = {
@@ -248,6 +267,7 @@ export type MutationApiclusterFailoverArgs = {
 /** Cluster management */
 export type MutationApiclusterFailover_ParamsArgs = {
   tarantool_params?: ?FailoverStateProviderCfgInputTarantool,
+  etcd2_params?: ?FailoverStateProviderCfgInputEtcd2,
   mode?: ?$ElementType<Scalars, "String">,
   state_provider?: ?$ElementType<Scalars, "String">
 };

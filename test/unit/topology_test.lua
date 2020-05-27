@@ -182,11 +182,25 @@ failover:
   state_provider: tarantool
 ...]])
 
+    check_config('topology_new.failover missing etcd2_params',
+[[---
+failover:
+  mode: stateful
+  state_provider: etcd2
+...]])
+
     check_config('topology_new.failover.tarantool_params.uri: Invalid URI "localhost" (missing port)',
 [[---
 failover:
   mode: eventual
   tarantool_params: {uri: "localhost"}
+...]])
+
+    check_config('topology_new.failover.etcd2_params.endpoints: Invalid URI "localhost" (missing port)',
+[[---
+failover:
+  mode: eventual
+  etcd2_params: {endpoints: "localhost"}
 ...]])
 
     check_config('topology_new.failover.tarantool_params.password must be a string, got nil',
@@ -739,6 +753,32 @@ failover:
   tarantool_params:
     uri: stateboard.com:4401
     password: ''
+servers:
+  aaaaaaaa-aaaa-4000-b000-000000000001:
+    replicaset_uuid: aaaaaaaa-0000-4000-b000-000000000001
+    uri: localhost:3301
+  aaaaaaaa-aaaa-4000-b000-000000000002:
+    replicaset_uuid: aaaaaaaa-0000-4000-b000-000000000001
+    uri: localhost:3331
+  bbbbbbbb-bbbb-4000-b000-000000000001: expelled
+replicasets:
+  aaaaaaaa-0000-4000-b000-000000000001:
+    master: aaaaaaaa-aaaa-4000-b000-000000000001
+    roles: {}
+...]])
+
+    check_config(true,
+[[---
+auth: true
+failover:
+  mode: stateful
+  state_provider: etcd2
+  etcd2_params:
+    endpoints: stateboard.com:4401
+    prefix: keys
+    username: user
+    password: ''
+    lock_delay: 40
 servers:
   aaaaaaaa-aaaa-4000-b000-000000000001:
     replicaset_uuid: aaaaaaaa-0000-4000-b000-000000000001

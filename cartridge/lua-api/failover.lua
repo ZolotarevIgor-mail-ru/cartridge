@@ -51,6 +51,7 @@ local function set_params(opts)
         mode = '?string',
         state_provider = '?string',
         tarantool_params = '?table',
+        etcd2_params = '?table',
     })
 
     local topology_cfg = confapplier.get_deepcopy('topology')

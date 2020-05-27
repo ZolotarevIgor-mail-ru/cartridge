@@ -122,6 +122,24 @@ type FailoverStateProviderCfgTarantool {
   password: String!
 }
 
+"""State provider configuration (etcd2)"""
+input FailoverStateProviderCfgInputEtcd2 {
+  endpoints: String!
+  prefix: String!
+  username: String!
+  password: String!
+  lock_delay: Float!
+}
+
+"""State provider configuration (etcd2)"""
+type FailoverStateProviderCfgEtcd2 {
+  endpoints: String!
+  prefix: String!
+  username: String!
+  password: String!
+  lock_delay: Float!
+}
+
 type Issue {
   level: String!
   instance_uuid: String
@@ -185,7 +203,7 @@ type MutationApicluster {
   failover(enabled: Boolean!): Boolean!
 
   """Configure automatic failover."""
-  failover_params(tarantool_params: FailoverStateProviderCfgInputTarantool, mode: String, state_provider: String): FailoverAPI!
+  failover_params(tarantool_params: FailoverStateProviderCfgInputTarantool, etcd2_params: FailoverStateProviderCfgInputEtcd2, mode: String, state_provider: String): FailoverAPI!
 
   """Checks that schema can be applied on cluster"""
   check_schema(as_yaml: String!): DDLCheckResult!
