@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Prettier errors displaying.
 
+- Error stacktrace received from the backend is shown in notifications
+
 ## [2.1.2] - 2020-04-24
 
 ### Fixed
