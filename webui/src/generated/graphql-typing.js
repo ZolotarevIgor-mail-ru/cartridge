@@ -132,7 +132,7 @@ export type FailoverStateProviderCfgTarantool = {
 
 /** State provider configuration (etcd2) */
 export type FailoverStateProviderCfgInputEtcd2 = {
-  endpoints: $ElementType<Scalars, "String">,
+  endpoints: Array<$ElementType<Scalars, "String">>,
   prefix: $ElementType<Scalars, "String">,
   username: $ElementType<Scalars, "String">,
   password: $ElementType<Scalars, "String">,
@@ -141,7 +141,7 @@ export type FailoverStateProviderCfgInputEtcd2 = {
 
 /** State provider configuration (etcd2) */
 export type FailoverStateProviderCfgEtcd2 = {
-  endpoints: $ElementType<Scalars, "String">,
+  endpoints: Array<$ElementType<Scalars, "String">>,
   prefix: $ElementType<Scalars, "String">,
   username: $ElementType<Scalars, "String">,
   password: $ElementType<Scalars, "String">,

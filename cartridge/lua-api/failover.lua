@@ -82,6 +82,9 @@ local function set_params(opts)
     if opts.tarantool_params ~= nil then
         topology_cfg.failover.tarantool_params = opts.tarantool_params
     end
+    if opts.etcd2_params ~= nil then
+        topology_cfg.failover.etcd2_params = opts.etcd2_params
+    end
 
     local ok, err = twophase.patch_clusterwide({topology = topology_cfg})
     if not ok then

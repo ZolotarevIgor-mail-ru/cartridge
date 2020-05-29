@@ -182,13 +182,6 @@ failover:
   state_provider: tarantool
 ...]])
 
-    check_config('topology_new.failover missing etcd2_params',
-[[---
-failover:
-  mode: stateful
-  state_provider: etcd2
-...]])
-
     check_config('topology_new.failover.tarantool_params.uri: Invalid URI "localhost" (missing port)',
 [[---
 failover:
@@ -196,18 +189,39 @@ failover:
   tarantool_params: {uri: "localhost"}
 ...]])
 
-    check_config('topology_new.failover.etcd2_params.endpoints: Invalid URI "localhost" (missing port)',
+    check_config('topology_new.failover.tarantool_params.password must be a string, got nil',
+[[---
+failover:
+  mode: eventual
+  tarantool_params: {uri: "localhost:9"}
+...]])
+
+    check_config('topology_new.failover missing etcd2_params',
+[[---
+failover:
+  mode: stateful
+  state_provider: etcd2
+...]])
+
+    check_config('topology_new.failover.etcd2_params.endpoints must be a table, got string',
 [[---
 failover:
   mode: eventual
   etcd2_params: {endpoints: "localhost"}
 ...]])
 
-    check_config('topology_new.failover.tarantool_params.password must be a string, got nil',
+    check_config('topology_new.failover.etcd2_params.endpoints[1] must be a string, got nil',
 [[---
 failover:
   mode: eventual
-  tarantool_params: {uri: "localhost:9"}
+  etcd2_params: {endpoints: {"localhost"}}
+...]])
+
+    check_config('topology_new.failover.etcd2_params.endpoints[2]: Invalid URI "localhost" (missing port)',
+[[---
+failover:
+  mode: eventual
+  etcd2_params: {endpoints: ["localhost:2379", "localhost"]}
 ...]])
 
     check_config('topology_new.failover has unknown parameter "unknown"',
@@ -774,7 +788,7 @@ failover:
   mode: stateful
   state_provider: etcd2
   etcd2_params:
-    endpoints: stateboard.com:4401
+    endpoints: [stateboard.com:4401]
     prefix: keys
     username: user
     password: ''

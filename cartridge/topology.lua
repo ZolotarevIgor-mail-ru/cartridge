@@ -415,17 +415,32 @@ local function validate_failover_schema(field, topology)
             )
 
             e_config:assert(
-                type(params.endpoints) == 'string',
-                '%s.endpoints must be a string, got %s',
+                type(params.endpoints) == 'table',
+                '%s.endpoints must be a table, got %s',
                 field, type(params.endpoints)
             )
 
-            local _, err = pool.format_uri(params.endpoints)
             e_config:assert(
-                not err,
-                '%s.endpoints: %s',
-                field, err and err.err
+                type(params.endpoints[1]) == 'string',
+                '%s.endpoints[1] must be a string, got %s',
+                field, type(params.endpoints[1])
             )
+
+            for i, endpoint in ipairs(params.endpoints) do
+
+                e_config:assert(
+                    type(endpoint) == 'string',
+                    '%s.endpoint[%d] must be a string, got %s',
+                    field, i, type(endpoint)
+                )
+
+                local _, err = pool.format_uri(endpoint)
+                e_config:assert(
+                    not err,
+                    '%s.endpoints[%d]: %s',
+                    field, i, err and err.err
+                )
+            end
 
             e_config:assert(
                 type(params.prefix) == 'string',

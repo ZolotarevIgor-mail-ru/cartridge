@@ -291,10 +291,21 @@ local function apply_config(conf, _)
     if vars.connect_fiber == nil
     or vars.connect_fiber:status() == 'dead'
     then
+        local uri
+        if failover_cfg.state_provider == 'tarantool' then
+            assert(failover_cfg.tarantool_params ~= nil)
+            uri = failover_cfg.tarantool_params.uri
+        elseif failover_cfg.state_provider == 'etcd2' then
+            assert(failover_cfg.etcd2_params ~= nil)
+            uri = failover_cfg.etcd2_params.endpoints[1]
+        else
+            uri = "unknown state_provider"
+        end
+
         log.info(
             'Starting failover coordinator' ..
             ' with external storage at %s',
-            failover_cfg.tarantool_params.uri
+            uri
         )
 
         vars.connect_fiber = fiber.new(take_control_loop, vars.client)
