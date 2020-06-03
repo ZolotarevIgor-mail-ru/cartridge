@@ -56,6 +56,9 @@ g.test_role_add_metrics_http_endpoint = function()
             },
             collect = {
               default = {},
+            },
+            global_labels = {
+              'alias'
             }
           }
         }),
@@ -64,4 +67,10 @@ g.test_role_add_metrics_http_endpoint = function()
 
     local resp = server:http_request('get', '/metrics')
     t.assert_equals(resp.status, 200)
+    for _, obs in pairs(resp.json) do
+      t.assert_equals(
+          g.cluster.main_server.alias, obs.label_pairs["alias"],
+          ("Alias label is present in metric %s"):format(obs.metric_name)
+      )
+  end
 end

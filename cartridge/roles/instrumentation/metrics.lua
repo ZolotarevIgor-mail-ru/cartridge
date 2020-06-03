@@ -36,6 +36,8 @@ local function validate_config(conf_new, conf_old)
           format: "prometheus"
       collect:
         default:
+      global_labels:
+        - alias
     ]]
 
     return true
@@ -49,6 +51,17 @@ local function apply_config(conf)
 
     for name, opts in pairs(metrics_conf.collect) do
         collectors[name](opts)
+    end
+
+    if metrics_conf.global_labels then
+        local params = argparse.parse()
+        local labels = {}
+        for _, label_name in ipairs(metrics_conf.global_labels) do
+            if label_name ~= nil then
+                labels[label_name] = params[label_name]
+            end
+        end
+        metrics.set_global_labels(labels)
     end
 
     local httpd = cartridge.service_get("httpd")
