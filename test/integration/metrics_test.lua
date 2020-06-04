@@ -14,7 +14,7 @@ g.before_all = function()
             {
                 uuid = helpers.uuid('a'),
                 roles = {
-                  'metrics'
+                  'metrics-configurator'
                 },
                 servers = {
                     {
@@ -38,7 +38,7 @@ end
 g.test_role_enabled = function()
     local resp = g.cluster.main_server.net_box:eval([[
       local cartridge = require("cartridge")
-      return cartridge.service_get("metrics") == nil
+      return cartridge.service_get("metrics-configurator") == nil
     ]])
     t.assert_equals(resp, false)
 end
@@ -56,14 +56,19 @@ g.test_role_add_metrics_http_endpoint = function()
             },
             collect = {
               default = {},
-            },
-            global_labels = {
-              'alias'
             }
           }
         }),
         raise = false
     })
+
+    local resp = g.cluster.main_server.net_box:eval([[
+      local cartridge = require("cartridge")
+      local metrics = cartridge.service_get("metrics")
+      metrics.counter('test-counter'):inc(1)
+    ]])
+
+    local counter_present = false
 
     local resp = server:http_request('get', '/metrics')
     t.assert_equals(resp.status, 200)
@@ -72,5 +77,10 @@ g.test_role_add_metrics_http_endpoint = function()
           g.cluster.main_server.alias, obs.label_pairs["alias"],
           ("Alias label is present in metric %s"):format(obs.metric_name)
       )
-  end
+      if obs.metric_name == 'test-counter' then
+          counter_present = true
+          t.assert_equals(obs.value, 1)
+      end
+    end
+    t.assert_equals(counter_present, true)
 end

@@ -24,6 +24,7 @@ local function init()
     if err ~= nil then
         return err
     end
+    cartridge.service_set('metrics',metrics)
 end
 
 local function validate_config(conf_new, conf_old)
@@ -36,8 +37,6 @@ local function validate_config(conf_new, conf_old)
           format: "prometheus"
       collect:
         default:
-      global_labels:
-        - alias
     ]]
 
     return true
@@ -53,16 +52,8 @@ local function apply_config(conf)
         collectors[name](opts)
     end
 
-    if metrics_conf.global_labels then
-        local params = argparse.parse()
-        local labels = {}
-        for _, label_name in ipairs(metrics_conf.global_labels) do
-            if label_name ~= nil then
-                labels[label_name] = params[label_name]
-            end
-        end
-        metrics.set_global_labels(labels)
-    end
+    local params = argparse.parse()
+    metrics.set_global_labels({alias = params.alias})
 
     local httpd = cartridge.service_get("httpd")
     for _, exporter in ipairs(metrics_conf.export) do
@@ -71,7 +62,7 @@ local function apply_config(conf)
 end
 
 return {
-    role_name = 'metrics',
+    role_name = 'metrics-configurator',
 
     init = init,
     validate_config = validate_config,
