@@ -19,6 +19,8 @@ local collectors = {
   end
 }
 
+local path_format = {}
+
 local function init()
     local params, err = argparse.parse()
     if err ~= nil then
@@ -57,7 +59,29 @@ local function apply_config(conf)
 
     local httpd = cartridge.service_get("httpd")
     for _, exporter in ipairs(metrics_conf.export) do
-        httpd:route({method = "GET", path = exporter.path}, handlers[exporter.format])
+        local path, format = exporter.path, exporter.format
+        if path_format[path] ~= format then
+            if path_format[path] then
+                httpd.routes[httpd.iroutes[path]] = nil
+                httpd.iroutes[path] = nil
+            end
+            httpd:route({method = "GET", name = path, path = path}, handlers[format])
+            path_format[path] = format
+        end
+    end
+    for path, _ in pairs(path_format) do
+        local is_present = false
+        for _, exporter in ipairs(metrics_conf.export) do
+            if path == exporter.path then
+                is_present = true
+                break
+            end
+        end
+        if not is_present then
+            httpd.routes[httpd.iroutes[path]] = nil
+            httpd.iroutes[path] = nil
+            path_format[path] = nil
+        end
     end
 end
 

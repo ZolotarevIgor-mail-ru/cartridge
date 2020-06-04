@@ -83,4 +83,25 @@ g.test_role_add_metrics_http_endpoint = function()
       end
     end
     t.assert_equals(counter_present, true)
+
+    local resp = server:http_request('put', '/admin/config', {
+      body = json.encode({
+        metrics = {
+          export = {
+            {
+              path = "/new-metrics",
+              format = "json"
+            }
+          },
+          collect = {
+            default = {},
+          }
+        }
+      }),
+      raise = false
+    })
+    local resp = server:http_request('get', '/metrics', {raise = false})
+    t.assert_equals(resp.status, 404)
+    local resp = server:http_request('get', '/new-metrics')
+    t.assert_equals(resp.status, 200)
 end
