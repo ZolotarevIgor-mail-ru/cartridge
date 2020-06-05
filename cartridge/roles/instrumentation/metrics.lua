@@ -26,7 +26,6 @@ local function init()
     if err ~= nil then
         return err
     end
-    cartridge.service_set('metrics',metrics)
 end
 
 local function validate_config(conf_new, conf_old)
@@ -85,10 +84,10 @@ local function apply_config(conf)
     end
 end
 
-return {
-    role_name = 'metrics-configurator',
+return setmetatable({
+    role_name = 'metrics',
 
     init = init,
     validate_config = validate_config,
     apply_config = apply_config
-}
+}, {__index = metrics})

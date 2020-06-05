@@ -14,7 +14,7 @@ g.before_all = function()
             {
                 uuid = helpers.uuid('a'),
                 roles = {
-                  'metrics-configurator'
+                  'metrics'
                 },
                 servers = {
                     {
@@ -38,7 +38,7 @@ end
 g.test_role_enabled = function()
     local resp = g.cluster.main_server.net_box:eval([[
       local cartridge = require("cartridge")
-      return cartridge.service_get("metrics-configurator") == nil
+      return cartridge.service_get("metrics") == nil
     ]])
     t.assert_equals(resp, false)
 end
